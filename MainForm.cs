@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using Microsoft.VisualBasic;
@@ -16,6 +17,8 @@ namespace CoreBrush
         private SaveFileDialog saveFileDialog = null!;
         private Bitmap? originalImage;
         private Bitmap? transformedImage;
+        private List<Bitmap> imageHistory = new List<Bitmap>(); // Histórico de transformações
+        private int maxHistorySize = 10; // Limite do histórico
 
         public MainForm()
         {
@@ -23,6 +26,18 @@ namespace CoreBrush
             InitializeForm();
             CreateMenus();
             CreatePictureBoxes();
+            // Configurar atalho Ctrl+Z
+            this.KeyPreview = true;
+            this.KeyDown += MainForm_KeyDown;
+        }
+
+        private void MainForm_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Control && e.KeyCode == Keys.Z)
+            {
+                Undo_Click(sender, e);
+                e.Handled = true;
+            }
         }
 
         private void InitializeComponent()
@@ -87,13 +102,18 @@ namespace CoreBrush
             var featuresMenu = new ToolStripMenuItem("&Extração de Características");
             featuresMenu.DropDownItems.Add("&Desafio", null, Challenge_Click);
 
+            // Menu EDITAR
+            var editMenu = new ToolStripMenuItem("&Editar");
+            editMenu.DropDownItems.Add("&Desfazer\tCtrl+Z", null, Undo_Click);
+
             menuStrip.Items.AddRange(new ToolStripItem[]
             {
                 fileMenu,
                 geometricMenu,
                 filtersMenu,
                 morphologyMenu,
-                featuresMenu
+                featuresMenu,
+                editMenu
             });
         }
 
@@ -129,7 +149,7 @@ namespace CoreBrush
             transformedImageBox.Location = new Point(620, transformedLabel.Bottom + 10);
             transformedImageBox.Size = new Size(580, 400);
             transformedImageBox.BorderStyle = BorderStyle.FixedSingle;
-            transformedImageBox.SizeMode = PictureBoxSizeMode.CenterImage;
+            transformedImageBox.SizeMode = PictureBoxSizeMode.Zoom; // Sempre começar com Zoom para caber a imagem completa
             transformedImageBox.BackColor = Color.White;
             this.Controls.Add(transformedImageBox);
 
@@ -159,9 +179,12 @@ namespace CoreBrush
                     originalImage = new Bitmap(openFileDialog.FileName);
                     originalImageBox.Image = originalImage;
                     transformedImage = new Bitmap(originalImage);
-                    transformedImageBox.SizeMode = PictureBoxSizeMode.CenterImage;
-                    transformedImageBox.Size = originalImageBox.Size;
+                    transformedImageBox.Size = originalImageBox.Size; // manter proporção do layout
+                    AdjustDisplayModeForImage(transformedImage);
                     transformedImageBox.Image = transformedImage;
+                    // Limpar histórico e adicionar estado inicial
+                    ClearHistory();
+                    SaveToHistory();
                 }
                 catch (Exception ex)
                 {
@@ -221,6 +244,10 @@ namespace CoreBrush
                 MessageBox.Show("Valores inválidos.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
+            
+            // Salvar estado atual no histórico antes da transformação
+            SaveToHistory();
+            
             Bitmap bmp = new Bitmap(transformedImage.Width, transformedImage.Height);
             using (Graphics g = Graphics.FromImage(bmp))
             {
@@ -229,6 +256,7 @@ namespace CoreBrush
             }
             transformedImage?.Dispose();
             transformedImage = bmp;
+            AdjustDisplayModeForImage(transformedImage);
             transformedImageBox.Image = transformedImage;
         }
 
@@ -246,6 +274,10 @@ namespace CoreBrush
                 MessageBox.Show("Valor inválido.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
+            
+            // Salvar estado atual no histórico antes da transformação
+            SaveToHistory();
+            
             double rad = angle * Math.PI / 180.0;
             int w = transformedImage.Width;
             int h = transformedImage.Height;
@@ -265,6 +297,7 @@ namespace CoreBrush
             }
             transformedImage?.Dispose();
             transformedImage = bmp;
+            AdjustDisplayModeForImage(transformedImage);
             transformedImageBox.Image = transformedImage;
         }
 
@@ -275,25 +308,21 @@ namespace CoreBrush
                 MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-            var axis = MessageBox.Show("Espelhar horizontalmente? (Sim = Horizontal, Não = Vertical)", "Espelhar", MessageBoxButtons.YesNoCancel);
-            if (axis == DialogResult.Cancel) return;
+            
+            // Salvar estado atual no histórico antes da transformação
+            SaveToHistory();
+            
             Bitmap bmp = new Bitmap(transformedImage.Width, transformedImage.Height);
             using (Graphics g = Graphics.FromImage(bmp))
             {
-                if (axis == DialogResult.Yes)
-                {
-                    g.ScaleTransform(-1, 1);
-                    g.TranslateTransform(-transformedImage.Width, 0);
-                }
-                else
-                {
-                    g.ScaleTransform(1, -1);
-                    g.TranslateTransform(0, -transformedImage.Height);
-                }
+                // Espelhamento horizontal
+                g.ScaleTransform(-1, 1);
+                g.TranslateTransform(-transformedImage.Width, 0);
                 g.DrawImage(transformedImage, 0, 0);
             }
             transformedImage?.Dispose();
             transformedImage = bmp;
+            AdjustDisplayModeForImage(transformedImage);
             transformedImageBox.Image = transformedImage;
         }
 
@@ -311,6 +340,10 @@ namespace CoreBrush
                 MessageBox.Show("Valor inválido.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
+            
+            // Salvar estado atual no histórico antes da transformação
+            SaveToHistory();
+            
             int newW = (int)(transformedImage.Width * factor);
             int newH = (int)(transformedImage.Height * factor);
             Bitmap bmp = new Bitmap(newW, newH);
@@ -321,6 +354,7 @@ namespace CoreBrush
             }
             transformedImage?.Dispose();
             transformedImage = bmp;
+            AdjustDisplayModeForImage(transformedImage);
             transformedImageBox.Image = transformedImage;
         }
 
@@ -341,6 +375,10 @@ namespace CoreBrush
                 MessageBox.Show("Valor inválido. Use um valor entre 0 e 1.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
+            
+            // Salvar estado atual no histórico antes da transformação
+            SaveToHistory();
+            
             int newW = Math.Max(1, (int)Math.Round(transformedImage.Width * factor));
             int newH = Math.Max(1, (int)Math.Round(transformedImage.Height * factor));
             Bitmap bmp = new Bitmap(newW, newH);
@@ -351,10 +389,19 @@ namespace CoreBrush
             }
             transformedImage?.Dispose();
             transformedImage = bmp;
-            transformedImageBox.SizeMode = PictureBoxSizeMode.CenterImage;
+            AdjustDisplayModeForImage(transformedImage);
             transformedImageBox.Image = null;
             transformedImageBox.Image = transformedImage;
             transformedImageBox.Refresh();
+        }
+
+        // Ajusta dinamicamente o modo de exibição conforme o tamanho relativo da imagem ao PictureBox
+        private void AdjustDisplayModeForImage(Bitmap img)
+        {
+            if (img.Width > transformedImageBox.Width || img.Height > transformedImageBox.Height)
+                transformedImageBox.SizeMode = PictureBoxSizeMode.Zoom; // imagem maior: ajustar para caber
+            else
+                transformedImageBox.SizeMode = PictureBoxSizeMode.CenterImage; // imagem menor: mostrar no tamanho real centralizada
         }
 
         // Filtros
@@ -415,6 +462,51 @@ namespace CoreBrush
             MessageBox.Show("Funcionalidade de Desafio será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
+        // Métodos de histórico e desfazer
+        private void SaveToHistory()
+        {
+            if (transformedImage == null) return;
+            
+            // Adicionar cópia da imagem atual ao histórico
+            imageHistory.Add(new Bitmap(transformedImage));
+            
+            // Limitar tamanho do histórico
+            while (imageHistory.Count > maxHistorySize)
+            {
+                imageHistory[0].Dispose();
+                imageHistory.RemoveAt(0);
+            }
+        }
+
+        private void ClearHistory()
+        {
+            foreach (var img in imageHistory)
+            {
+                img.Dispose();
+            }
+            imageHistory.Clear();
+        }
+
+        private void Undo_Click(object? sender, EventArgs e)
+        {
+            if (imageHistory.Count < 2)
+            {
+                MessageBox.Show("Nenhuma operação para desfazer!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Remove a imagem atual (última do histórico)
+            var currentImage = imageHistory[imageHistory.Count - 1];
+            currentImage.Dispose();
+            imageHistory.RemoveAt(imageHistory.Count - 1);
+
+            // Restaura a imagem anterior
+            transformedImage?.Dispose();
+            transformedImage = new Bitmap(imageHistory[imageHistory.Count - 1]);
+            AdjustDisplayModeForImage(transformedImage);
+            transformedImageBox.Image = transformedImage;
+        }
+
         #endregion
 
         protected override void Dispose(bool disposing)
@@ -423,6 +515,7 @@ namespace CoreBrush
             {
                 originalImage?.Dispose();
                 transformedImage?.Dispose();
+                ClearHistory();
             }
             base.Dispose(disposing);
         }
