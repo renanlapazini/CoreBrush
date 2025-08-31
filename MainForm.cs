@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using Microsoft.VisualBasic;
 
 namespace CoreBrush
 {
@@ -128,7 +129,7 @@ namespace CoreBrush
             transformedImageBox.Location = new Point(620, transformedLabel.Bottom + 10);
             transformedImageBox.Size = new Size(580, 400);
             transformedImageBox.BorderStyle = BorderStyle.FixedSingle;
-            transformedImageBox.SizeMode = PictureBoxSizeMode.Zoom;
+            transformedImageBox.SizeMode = PictureBoxSizeMode.CenterImage;
             transformedImageBox.BackColor = Color.White;
             this.Controls.Add(transformedImageBox);
 
@@ -158,6 +159,8 @@ namespace CoreBrush
                     originalImage = new Bitmap(openFileDialog.FileName);
                     originalImageBox.Image = originalImage;
                     transformedImage = new Bitmap(originalImage);
+                    transformedImageBox.SizeMode = PictureBoxSizeMode.CenterImage;
+                    transformedImageBox.Size = originalImageBox.Size;
                     transformedImageBox.Image = transformedImage;
                 }
                 catch (Exception ex)
@@ -203,27 +206,155 @@ namespace CoreBrush
         // Transformações Geométricas
         private void Translate_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show("Funcionalidade de Translação será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            // Solicita deslocamento X e Y
+            var dxStr = Microsoft.VisualBasic.Interaction.InputBox("Deslocamento em X:", "Transladar", "50");
+            if (string.IsNullOrWhiteSpace(dxStr)) return;
+            var dyStr = Microsoft.VisualBasic.Interaction.InputBox("Deslocamento em Y:", "Transladar", "50");
+            if (string.IsNullOrWhiteSpace(dyStr)) return;
+            if (!int.TryParse(dxStr, out int dx) || !int.TryParse(dyStr, out int dy))
+            {
+                MessageBox.Show("Valores inválidos.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            Bitmap bmp = new Bitmap(transformedImage.Width, transformedImage.Height);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.Clear(Color.White);
+                g.DrawImage(transformedImage, dx, dy);
+            }
+            transformedImage?.Dispose();
+            transformedImage = bmp;
+            transformedImageBox.Image = transformedImage;
         }
 
         private void Rotate_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show("Funcionalidade de Rotação será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            var angleStr = Microsoft.VisualBasic.Interaction.InputBox("Ângulo de rotação (graus):", "Rotacionar", "90");
+            if (string.IsNullOrWhiteSpace(angleStr)) return;
+            if (!float.TryParse(angleStr, out float angle))
+            {
+                MessageBox.Show("Valor inválido.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            double rad = angle * Math.PI / 180.0;
+            int w = transformedImage.Width;
+            int h = transformedImage.Height;
+            double cos = Math.Abs(Math.Cos(rad));
+            double sin = Math.Abs(Math.Sin(rad));
+            int newW = (int)Math.Round(w * cos + h * sin);
+            int newH = (int)Math.Round(h * cos + w * sin);
+            Bitmap bmp = new Bitmap(newW, newH);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.Clear(Color.White);
+                // Centraliza a imagem rotacionada
+                g.TranslateTransform(newW / 2f, newH / 2f);
+                g.RotateTransform(angle);
+                g.TranslateTransform(-w / 2f, -h / 2f);
+                g.DrawImage(transformedImage, 0, 0);
+            }
+            transformedImage?.Dispose();
+            transformedImage = bmp;
+            transformedImageBox.Image = transformedImage;
         }
 
         private void Mirror_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show("Funcionalidade de Espelhamento será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            var axis = MessageBox.Show("Espelhar horizontalmente? (Sim = Horizontal, Não = Vertical)", "Espelhar", MessageBoxButtons.YesNoCancel);
+            if (axis == DialogResult.Cancel) return;
+            Bitmap bmp = new Bitmap(transformedImage.Width, transformedImage.Height);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                if (axis == DialogResult.Yes)
+                {
+                    g.ScaleTransform(-1, 1);
+                    g.TranslateTransform(-transformedImage.Width, 0);
+                }
+                else
+                {
+                    g.ScaleTransform(1, -1);
+                    g.TranslateTransform(0, -transformedImage.Height);
+                }
+                g.DrawImage(transformedImage, 0, 0);
+            }
+            transformedImage?.Dispose();
+            transformedImage = bmp;
+            transformedImageBox.Image = transformedImage;
         }
 
         private void Increase_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show("Funcionalidade de Aumento será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            var factorStr = Microsoft.VisualBasic.Interaction.InputBox("Fator de aumento:", "Aumentar", "1.5");
+            if (string.IsNullOrWhiteSpace(factorStr)) return;
+            if (!float.TryParse(factorStr, out float factor) || factor <= 0)
+            {
+                MessageBox.Show("Valor inválido.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            int newW = (int)(transformedImage.Width * factor);
+            int newH = (int)(transformedImage.Height * factor);
+            Bitmap bmp = new Bitmap(newW, newH);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.DrawImage(transformedImage, 0, 0, newW, newH);
+            }
+            transformedImage?.Dispose();
+            transformedImage = bmp;
+            transformedImageBox.Image = transformedImage;
         }
 
         private void Decrease_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show("Funcionalidade de Diminuição será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            var factorStr = Microsoft.VisualBasic.Interaction.InputBox("Fator de diminuição:", "Diminuir", "0.5");
+            if (string.IsNullOrWhiteSpace(factorStr)) return;
+            factorStr = factorStr.Replace(',', '.');
+            float factor;
+            bool ok = float.TryParse(factorStr, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out factor);
+            if (!ok || factor <= 0 || factor >= 1)
+            {
+                MessageBox.Show("Valor inválido. Use um valor entre 0 e 1.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            int newW = Math.Max(1, (int)Math.Round(transformedImage.Width * factor));
+            int newH = Math.Max(1, (int)Math.Round(transformedImage.Height * factor));
+            Bitmap bmp = new Bitmap(newW, newH);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.DrawImage(transformedImage, 0, 0, newW, newH);
+            }
+            transformedImage?.Dispose();
+            transformedImage = bmp;
+            transformedImageBox.SizeMode = PictureBoxSizeMode.CenterImage;
+            transformedImageBox.Image = null;
+            transformedImageBox.Image = transformedImage;
+            transformedImageBox.Refresh();
         }
 
         // Filtros
