@@ -407,12 +407,90 @@ namespace CoreBrush
         // Filtros
         private void BrightnessContrast_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show("Funcionalidade de Brilho e Contraste será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Solicita valores de brilho e contraste
+            var brightnessStr = Microsoft.VisualBasic.Interaction.InputBox("Ajuste de brilho (-100 a 100):", "Brilho e Contraste", "0");
+            if (string.IsNullOrWhiteSpace(brightnessStr)) return;
+            var contrastStr = Microsoft.VisualBasic.Interaction.InputBox("Ajuste de contraste (0.1 a 3.0):", "Brilho e Contraste", "1.0");
+            if (string.IsNullOrWhiteSpace(contrastStr)) return;
+
+            if (!int.TryParse(brightnessStr, out int brightness) || brightness < -100 || brightness > 100)
+            {
+                MessageBox.Show("Valor de brilho inválido. Use valores entre -100 e 100.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            contrastStr = contrastStr.Replace(',', '.');
+            if (!float.TryParse(contrastStr, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float contrast) || contrast < 0.1f || contrast > 3.0f)
+            {
+                MessageBox.Show("Valor de contraste inválido. Use valores between 0.1 e 3.0.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            // Salvar estado atual no histórico antes da transformação
+            SaveToHistory();
+
+            Bitmap bmp = new Bitmap(transformedImage.Width, transformedImage.Height);
+            for (int x = 0; x < transformedImage.Width; x++)
+            {
+                for (int y = 0; y < transformedImage.Height; y++)
+                {
+                    Color pixel = transformedImage.GetPixel(x, y);
+                    
+                    // Aplicar contraste primeiro, depois brilho
+                    int r = (int)(((pixel.R / 255.0 - 0.5) * contrast + 0.5) * 255.0 + brightness);
+                    int g = (int)(((pixel.G / 255.0 - 0.5) * contrast + 0.5) * 255.0 + brightness);
+                    int b = (int)(((pixel.B / 255.0 - 0.5) * contrast + 0.5) * 255.0 + brightness);
+                    
+                    // Garantir que os valores estejam entre 0 e 255
+                    r = Math.Max(0, Math.Min(255, r));
+                    g = Math.Max(0, Math.Min(255, g));
+                    b = Math.Max(0, Math.Min(255, b));
+                    
+                    Color adjustedColor = Color.FromArgb(pixel.A, r, g, b);
+                    bmp.SetPixel(x, y, adjustedColor);
+                }
+            }
+
+            transformedImage?.Dispose();
+            transformedImage = bmp;
+            AdjustDisplayModeForImage(transformedImage);
+            transformedImageBox.Image = transformedImage;
         }
 
         private void Grayscale_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show("Funcionalidade de Grayscale será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Salvar estado atual no histórico antes da transformação
+            SaveToHistory();
+
+            Bitmap bmp = new Bitmap(transformedImage.Width, transformedImage.Height);
+            for (int x = 0; x < transformedImage.Width; x++)
+            {
+                for (int y = 0; y < transformedImage.Height; y++)
+                {
+                    Color pixel = transformedImage.GetPixel(x, y);
+                    // Conversão para escala de cinza usando luminância
+                    int gray = (int)(0.299 * pixel.R + 0.587 * pixel.G + 0.114 * pixel.B);
+                    Color grayColor = Color.FromArgb(pixel.A, gray, gray, gray);
+                    bmp.SetPixel(x, y, grayColor);
+                }
+            }
+
+            transformedImage?.Dispose();
+            transformedImage = bmp;
+            AdjustDisplayModeForImage(transformedImage);
+            transformedImageBox.Image = transformedImage;
         }
 
         private void LowPass_Click(object? sender, EventArgs e)
