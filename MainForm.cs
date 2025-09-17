@@ -149,11 +149,10 @@ namespace CoreBrush
             transformedImageBox.Location = new Point(620, transformedLabel.Bottom + 10);
             transformedImageBox.Size = new Size(580, 400);
             transformedImageBox.BorderStyle = BorderStyle.FixedSingle;
-            transformedImageBox.SizeMode = PictureBoxSizeMode.Zoom; // Sempre começar com Zoom para caber a imagem completa
+            transformedImageBox.SizeMode = PictureBoxSizeMode.Zoom;
             transformedImageBox.BackColor = Color.White;
             this.Controls.Add(transformedImageBox);
 
-            // Ajustar o layout quando a janela for redimensionada
             this.Resize += MainForm_Resize;
         }
 
