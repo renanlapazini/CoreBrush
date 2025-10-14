@@ -244,9 +244,6 @@ namespace CoreBrush
                 return;
             }
             
-            // Salvar estado atual no histórico antes da transformação
-            SaveToHistory();
-            
             Bitmap bmp = new Bitmap(transformedImage.Width, transformedImage.Height);
             using (Graphics g = Graphics.FromImage(bmp))
             {
@@ -257,6 +254,8 @@ namespace CoreBrush
             transformedImage = bmp;
             AdjustDisplayModeForImage(transformedImage);
             transformedImageBox.Image = transformedImage;
+            // Salvar novo estado no histórico
+            SaveToHistory();
         }
 
         private void Rotate_Click(object? sender, EventArgs e)
@@ -273,9 +272,6 @@ namespace CoreBrush
                 MessageBox.Show("Valor inválido.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-            
-            // Salvar estado atual no histórico antes da transformação
-            SaveToHistory();
             
             double rad = angle * Math.PI / 180.0;
             int w = transformedImage.Width;
@@ -298,6 +294,7 @@ namespace CoreBrush
             transformedImage = bmp;
             AdjustDisplayModeForImage(transformedImage);
             transformedImageBox.Image = transformedImage;
+            SaveToHistory();
         }
 
         private void Mirror_Click(object? sender, EventArgs e)
@@ -307,9 +304,6 @@ namespace CoreBrush
                 MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-            
-            // Salvar estado atual no histórico antes da transformação
-            SaveToHistory();
             
             Bitmap bmp = new Bitmap(transformedImage.Width, transformedImage.Height);
             using (Graphics g = Graphics.FromImage(bmp))
@@ -323,6 +317,7 @@ namespace CoreBrush
             transformedImage = bmp;
             AdjustDisplayModeForImage(transformedImage);
             transformedImageBox.Image = transformedImage;
+            SaveToHistory();
         }
 
         private void Increase_Click(object? sender, EventArgs e)
@@ -340,9 +335,6 @@ namespace CoreBrush
                 return;
             }
             
-            // Salvar estado atual no histórico antes da transformação
-            SaveToHistory();
-            
             int newW = (int)(transformedImage.Width * factor);
             int newH = (int)(transformedImage.Height * factor);
             Bitmap bmp = new Bitmap(newW, newH);
@@ -355,6 +347,7 @@ namespace CoreBrush
             transformedImage = bmp;
             AdjustDisplayModeForImage(transformedImage);
             transformedImageBox.Image = transformedImage;
+            SaveToHistory();
         }
 
         private void Decrease_Click(object? sender, EventArgs e)
@@ -375,9 +368,6 @@ namespace CoreBrush
                 return;
             }
             
-            // Salvar estado atual no histórico antes da transformação
-            SaveToHistory();
-            
             int newW = Math.Max(1, (int)Math.Round(transformedImage.Width * factor));
             int newH = Math.Max(1, (int)Math.Round(transformedImage.Height * factor));
             Bitmap bmp = new Bitmap(newW, newH);
@@ -392,6 +382,7 @@ namespace CoreBrush
             transformedImageBox.Image = null;
             transformedImageBox.Image = transformedImage;
             transformedImageBox.Refresh();
+            SaveToHistory();
         }
 
         // Ajusta dinamicamente o modo de exibição conforme o tamanho relativo da imagem ao PictureBox
@@ -431,9 +422,6 @@ namespace CoreBrush
                 return;
             }
 
-            // Salvar estado atual no histórico antes da transformação
-            SaveToHistory();
-
             Bitmap bmp = new Bitmap(transformedImage.Width, transformedImage.Height);
             for (int x = 0; x < transformedImage.Width; x++)
             {
@@ -460,6 +448,7 @@ namespace CoreBrush
             transformedImage = bmp;
             AdjustDisplayModeForImage(transformedImage);
             transformedImageBox.Image = transformedImage;
+            SaveToHistory();
         }
 
         private void Grayscale_Click(object? sender, EventArgs e)
@@ -469,9 +458,6 @@ namespace CoreBrush
                 MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-
-            // Salvar estado atual no histórico antes da transformação
-            SaveToHistory();
 
             Bitmap bmp = new Bitmap(transformedImage.Width, transformedImage.Height);
             for (int x = 0; x < transformedImage.Width; x++)
@@ -490,21 +476,166 @@ namespace CoreBrush
             transformedImage = bmp;
             AdjustDisplayModeForImage(transformedImage);
             transformedImageBox.Image = transformedImage;
+            SaveToHistory();
         }
 
         private void LowPass_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show("Funcionalidade de Filtro Passa Baixa será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var choice = Interaction.InputBox(
+                "Escolha o filtro Passa-Baixa:\n1 - Média (3x3)\n2 - Gaussiano (5x5)",
+                "Filtro Passa-Baixa",
+                "1");
+            if (string.IsNullOrWhiteSpace(choice)) return;
+
+            Bitmap result;
+            if (choice.Trim() == "2")
+            {
+                // Gaussiano 5x5 (sigma ~= 1), fator = 1/256
+                double[,] kernel = new double[,]
+                {
+                    { 1,  4,  6,  4, 1 },
+                    { 4, 16, 24, 16, 4 },
+                    { 6, 24, 36, 24, 6 },
+                    { 4, 16, 24, 16, 4 },
+                    { 1,  4,  6,  4, 1 }
+                };
+                result = ApplyConvolution(transformedImage, kernel, factor: 1.0 / 256.0, bias: 0.0);
+            }
+            else
+            {
+                // Média 3x3 (box blur), fator = 1/9
+                double[,] kernel = new double[,]
+                {
+                    { 1, 1, 1 },
+                    { 1, 1, 1 },
+                    { 1, 1, 1 }
+                };
+                result = ApplyConvolution(transformedImage, kernel, factor: 1.0 / 9.0, bias: 0.0);
+            }
+
+            transformedImage?.Dispose();
+            transformedImage = result;
+            AdjustDisplayModeForImage(transformedImage);
+            transformedImageBox.Image = transformedImage;
+            SaveToHistory();
         }
 
         private void HighPass_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show("Funcionalidade de Filtro Passa Alta será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var choice = Interaction.InputBox(
+                "Escolha o filtro Passa-Alta:\n1 - Laplaciano (bordas)\n2 - Unsharp Mask (realce)",
+                "Filtro Passa-Alta",
+                "2");
+            if (string.IsNullOrWhiteSpace(choice)) return;
+
+            Bitmap result;
+            if (choice.Trim() == "1")
+            {
+                // Laplaciano 3x3 (8-vizinhos), fator = 1
+                double[,] kernel = new double[,]
+                {
+                    { -1, -1, -1 },
+                    { -1,  8, -1 },
+                    { -1, -1, -1 }
+                };
+                // Aplicar laplaciano para extrair bordas e normalizar para visualização
+                var edges = ApplyConvolution(transformedImage, kernel, factor: 1.0, bias: 0.0, clampToGrayScale: true, absoluteValue: true);
+                result = edges;
+            }
+            else
+            {
+                // Unsharp mask: result = original + amount * (original - blur(original))
+                var amountStr = Interaction.InputBox("Fator de realce (0.5 a 2.0):", "Unsharp Mask", "1.0");
+                if (string.IsNullOrWhiteSpace(amountStr)) return;
+                amountStr = amountStr.Replace(',', '.');
+                if (!double.TryParse(amountStr, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double amount) || amount < 0.5 || amount > 2.0)
+                {
+                    MessageBox.Show("Valor inválido. Use um valor entre 0.5 e 2.0.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                // Gaussian blur 5x5 para criar a máscara
+                double[,] g = new double[,]
+                {
+                    { 1,  4,  6,  4, 1 },
+                    { 4, 16, 24, 16, 4 },
+                    { 6, 24, 36, 24, 6 },
+                    { 4, 16, 24, 16, 4 },
+                    { 1,  4,  6,  4, 1 }
+                };
+                using var blurred = ApplyConvolution(transformedImage, g, factor: 1.0 / 256.0, bias: 0.0);
+                result = ApplyUnsharp(transformedImage, blurred, amount);
+            }
+
+            transformedImage?.Dispose();
+            transformedImage = result;
+            AdjustDisplayModeForImage(transformedImage);
+            transformedImageBox.Image = transformedImage;
+            SaveToHistory();
         }
 
         private void Threshold_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show("Funcionalidade de Threshold será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var choice = Interaction.InputBox(
+                "Escolha o método de Threshold:\n1 - Manual (0-255)\n2 - Otsu (automático)\n3 - Adaptativo (Gaussiano 5x5)",
+                "Thresholding",
+                "2");
+            if (string.IsNullOrWhiteSpace(choice)) return;
+
+            Bitmap result;
+            switch (choice.Trim())
+            {
+                case "1":
+                    var tStr = Interaction.InputBox("Valor do limiar (0-255):", "Threshold Manual", "128");
+                    if (string.IsNullOrWhiteSpace(tStr)) return;
+                    if (!int.TryParse(tStr, out int t) || t < 0 || t > 255)
+                    {
+                        MessageBox.Show("Valor inválido. Use 0 a 255.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+                    result = ApplyThresholdManual(transformedImage, t);
+                    break;
+                case "3":
+                    var cStr = Interaction.InputBox("Constante C (desloca o limiar local):", "Threshold Adaptativo", "5");
+                    if (string.IsNullOrWhiteSpace(cStr)) return;
+                    cStr = cStr.Replace(',', '.');
+                    if (!double.TryParse(cStr, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double C))
+                    {
+                        MessageBox.Show("Valor inválido para C.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+                    result = ApplyThresholdAdaptiveGaussian(transformedImage, C);
+                    break;
+                case "2":
+                default:
+                    int otsuT = ComputeOtsuThreshold(transformedImage);
+                    result = ApplyThresholdManual(transformedImage, otsuT);
+                    break;
+            }
+
+            transformedImage?.Dispose();
+            transformedImage = result;
+            AdjustDisplayModeForImage(transformedImage);
+            transformedImageBox.Image = transformedImage;
+            SaveToHistory();
         }
 
         private void Thinning_Click(object? sender, EventArgs e)
@@ -585,6 +716,214 @@ namespace CoreBrush
         }
 
         #endregion
+
+        // ============================
+        // Utilidades de Processamento
+        // ============================
+
+        // Convolução genérica RGB, com opções para valor absoluto (bordas) e conversão para escala de cinza
+        private static Bitmap ApplyConvolution(Bitmap source, double[,] kernel, double factor = 1.0, double bias = 0.0, bool clampToGrayScale = false, bool absoluteValue = false)
+        {
+            int width = source.Width;
+            int height = source.Height;
+            Bitmap result = new Bitmap(width, height);
+
+            int kH = kernel.GetLength(0); // linhas
+            int kW = kernel.GetLength(1); // colunas
+            int kHalfW = kW / 2;
+            int kHalfH = kH / 2;
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    double r = 0, g = 0, b = 0;
+                    int a = source.GetPixel(x, y).A;
+
+                    for (int ky = 0; ky < kH; ky++)
+                    {
+                        int sy = Math.Clamp(y + ky - kHalfH, 0, height - 1);
+                        for (int kx = 0; kx < kW; kx++)
+                        {
+                            int sx = Math.Clamp(x + kx - kHalfW, 0, width - 1);
+                            Color sc = source.GetPixel(sx, sy);
+                            double kval = kernel[ky, kx];
+                            r += sc.R * kval;
+                            g += sc.G * kval;
+                            b += sc.B * kval;
+                        }
+                    }
+
+                    if (absoluteValue)
+                    {
+                        r = Math.Abs(r);
+                        g = Math.Abs(g);
+                        b = Math.Abs(b);
+                    }
+
+                    r = r * factor + bias;
+                    g = g * factor + bias;
+                    b = b * factor + bias;
+
+                    int ri = (int)Math.Round(Math.Clamp(r, 0, 255));
+                    int gi = (int)Math.Round(Math.Clamp(g, 0, 255));
+                    int bi = (int)Math.Round(Math.Clamp(b, 0, 255));
+
+                    if (clampToGrayScale)
+                    {
+                        int gray = (int)Math.Round(0.299 * ri + 0.587 * gi + 0.114 * bi);
+                        gray = Math.Max(0, Math.Min(255, gray));
+                        result.SetPixel(x, y, Color.FromArgb(a, gray, gray, gray));
+                    }
+                    else
+                    {
+                        result.SetPixel(x, y, Color.FromArgb(a, ri, gi, bi));
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        // Realce tipo Unsharp Mask: out = original + amount * (original - blurred)
+        private static Bitmap ApplyUnsharp(Bitmap original, Bitmap blurred, double amount)
+        {
+            int width = original.Width;
+            int height = original.Height;
+            Bitmap? resized = null;
+            Bitmap blurRef = blurred;
+            if (blurred.Width != width || blurred.Height != height)
+            {
+                // Ajusta com redimensionamento básico
+                resized = new Bitmap(original.Width, original.Height);
+                using (Graphics g = Graphics.FromImage(resized))
+                {
+                    g.DrawImage(blurred, 0, 0, original.Width, original.Height);
+                }
+                blurRef = resized;
+            }
+
+            Bitmap result = new Bitmap(width, height);
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Color o = original.GetPixel(x, y);
+                    Color b = blurRef.GetPixel(x, y);
+                    double r = o.R + amount * (o.R - b.R);
+                    double g = o.G + amount * (o.G - b.G);
+                    double bl = o.B + amount * (o.B - b.B);
+                    int ri = (int)Math.Round(Math.Clamp(r, 0, 255));
+                    int gi = (int)Math.Round(Math.Clamp(g, 0, 255));
+                    int bi = (int)Math.Round(Math.Clamp(bl, 0, 255));
+                    result.SetPixel(x, y, Color.FromArgb(o.A, ri, gi, bi));
+                }
+            }
+            resized?.Dispose();
+            return result;
+        }
+
+        // ============================
+        // Thresholding helpers
+        // ============================
+
+        // Aplica threshold binário usando luminância (independe de ser colorido ou cinza)
+        private static Bitmap ApplyThresholdManual(Bitmap source, int threshold)
+        {
+            int w = source.Width;
+            int h = source.Height;
+            Bitmap result = new Bitmap(w, h);
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    var p = source.GetPixel(x, y);
+                    int gray = (int)(0.299 * p.R + 0.587 * p.G + 0.114 * p.B);
+                    int bw = gray >= threshold ? 255 : 0;
+                    result.SetPixel(x, y, Color.FromArgb(p.A, bw, bw, bw));
+                }
+            }
+            return result;
+        }
+
+        // Calcula limiar de Otsu sobre a luminância
+        private static int ComputeOtsuThreshold(Bitmap source)
+        {
+            // Histograma de 256 níveis
+            int[] hist = new int[256];
+            int w = source.Width;
+            int h = source.Height;
+            int total = w * h;
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    var p = source.GetPixel(x, y);
+                    int gray = (int)(0.299 * p.R + 0.587 * p.G + 0.114 * p.B);
+                    hist[gray]++;
+                }
+            }
+
+            double sum = 0;
+            for (int i = 0; i < 256; i++) sum += i * hist[i];
+
+            double sumB = 0;
+            int wB = 0;
+            int wF = 0;
+            double maxVar = -1;
+            int threshold = 0;
+
+            for (int t = 0; t < 256; t++)
+            {
+                wB += hist[t];
+                if (wB == 0) continue;
+                wF = total - wB;
+                if (wF == 0) break;
+
+                sumB += t * hist[t];
+                double mB = sumB / wB;
+                double mF = (sum - sumB) / wF;
+                double between = wB * wF * (mB - mF) * (mB - mF);
+                if (between > maxVar)
+                {
+                    maxVar = between;
+                    threshold = t;
+                }
+            }
+            return threshold;
+        }
+
+        // Threshold adaptativo usando média gaussiana local 5x5 menos uma constante C
+        private static Bitmap ApplyThresholdAdaptiveGaussian(Bitmap source, double C)
+        {
+            // Suaviza (média gaussiana) e cria um mapa de limiares locais
+            double[,] g5 = new double[,]
+            {
+                { 1,  4,  6,  4, 1 },
+                { 4, 16, 24, 16, 4 },
+                { 6, 24, 36, 24, 6 },
+                { 4, 16, 24, 16, 4 },
+                { 1,  4,  6,  4, 1 }
+            };
+            using var localMean = ApplyConvolution(source, g5, factor: 1.0 / 256.0, bias: 0.0, clampToGrayScale: true);
+
+            int w = source.Width;
+            int h = source.Height;
+            Bitmap result = new Bitmap(w, h);
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    var p = source.GetPixel(x, y);
+                    int gray = (int)(0.299 * p.R + 0.587 * p.G + 0.114 * p.B);
+                    int tLocal = (int)Math.Round(localMean.GetPixel(x, y).R - C);
+                    tLocal = Math.Max(0, Math.Min(255, tLocal));
+                    int bw = gray >= tLocal ? 255 : 0;
+                    result.SetPixel(x, y, Color.FromArgb(p.A, bw, bw, bw));
+                }
+            }
+            return result;
+        }
 
         protected override void Dispose(bool disposing)
         {
