@@ -210,5 +210,129 @@ namespace CoreBrush
             }
             return result;
         }
+
+        // ============================
+        // Morphology (3x3 structuring element)
+        // ============================
+
+        // Binary erosion (foreground=white=255). Pixel stays white only if ALL neighbors under SE are white
+        public static Bitmap ErodeBinary(Bitmap source)
+        {
+            int w = source.Width, h = source.Height;
+            Bitmap result = new Bitmap(w, h);
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    bool allWhite = true;
+                    for (int dy = -1; dy <= 1 && allWhite; dy++)
+                    {
+                        int yy = Math.Clamp(y + dy, 0, h - 1);
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            int xx = Math.Clamp(x + dx, 0, w - 1);
+                            var p = source.GetPixel(xx, yy);
+                            int gray = (int)(0.299 * p.R + 0.587 * p.G + 0.114 * p.B);
+                            if (gray < 255)
+                            {
+                                allWhite = false;
+                                break;
+                            }
+                        }
+                    }
+                    int val = allWhite ? 255 : 0;
+                    result.SetPixel(x, y, Color.FromArgb(255, val, val, val));
+                }
+            }
+            return result;
+        }
+
+        // Binary dilation (foreground=white=255). Pixel becomes white if ANY neighbor under SE is white
+        public static Bitmap DilateBinary(Bitmap source)
+        {
+            int w = source.Width, h = source.Height;
+            Bitmap result = new Bitmap(w, h);
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    bool anyWhite = false;
+                    for (int dy = -1; dy <= 1 && !anyWhite; dy++)
+                    {
+                        int yy = Math.Clamp(y + dy, 0, h - 1);
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            int xx = Math.Clamp(x + dx, 0, w - 1);
+                            var p = source.GetPixel(xx, yy);
+                            int gray = (int)(0.299 * p.R + 0.587 * p.G + 0.114 * p.B);
+                            if (gray > 0)
+                            {
+                                anyWhite = true;
+                                break;
+                            }
+                        }
+                    }
+                    int val = anyWhite ? 255 : 0;
+                    result.SetPixel(x, y, Color.FromArgb(255, val, val, val));
+                }
+            }
+            return result;
+        }
+
+        // Grayscale erosion (minimum in 3x3 neighborhood)
+        public static Bitmap ErodeGrayscale(Bitmap source)
+        {
+            int w = source.Width, h = source.Height;
+            Bitmap result = new Bitmap(w, h);
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    int minVal = 255;
+                    int a = source.GetPixel(x, y).A;
+                    for (int dy = -1; dy <= 1; dy++)
+                    {
+                        int yy = Math.Clamp(y + dy, 0, h - 1);
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            int xx = Math.Clamp(x + dx, 0, w - 1);
+                            var p = source.GetPixel(xx, yy);
+                            int gray = (int)(0.299 * p.R + 0.587 * p.G + 0.114 * p.B);
+                            if (gray < minVal) minVal = gray;
+                        }
+                    }
+                    result.SetPixel(x, y, Color.FromArgb(a, minVal, minVal, minVal));
+                }
+            }
+            return result;
+        }
+
+        // Grayscale dilation (maximum in 3x3 neighborhood)
+        public static Bitmap DilateGrayscale(Bitmap source)
+        {
+            int w = source.Width, h = source.Height;
+            Bitmap result = new Bitmap(w, h);
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    int maxVal = 0;
+                    int a = source.GetPixel(x, y).A;
+                    for (int dy = -1; dy <= 1; dy++)
+                    {
+                        int yy = Math.Clamp(y + dy, 0, h - 1);
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            int xx = Math.Clamp(x + dx, 0, w - 1);
+                            var p = source.GetPixel(xx, yy);
+                            int gray = (int)(0.299 * p.R + 0.587 * p.G + 0.114 * p.B);
+                            if (gray > maxVal) maxVal = gray;
+                        }
+                    }
+                    result.SetPixel(x, y, Color.FromArgb(a, maxVal, maxVal, maxVal));
+                }
+            }
+            return result;
+        }
     }
 }

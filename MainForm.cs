@@ -612,12 +612,52 @@ namespace CoreBrush
         // Morfologia Matemática
         private void Dilation_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show("Funcionalidade de Dilatação será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var choice = Interaction.InputBox(
+                "Dilatação:\n1 - Binária (preencher buracos, unir)\n2 - Tons de Cinza (max 3x3)",
+                "Dilatação",
+                "1");
+            if (string.IsNullOrWhiteSpace(choice)) return;
+
+            Bitmap result = choice.Trim() == "2"
+                ? ImageProcessor.DilateGrayscale(transformedImage)
+                : ImageProcessor.DilateBinary(transformedImage);
+
+            transformedImage?.Dispose();
+            transformedImage = result;
+            AdjustDisplayModeForImage(transformedImage);
+            transformedImageBox.Image = transformedImage;
+            SaveToHistory();
         }
 
         private void Erosion_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show("Funcionalidade de Erosão será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var choice = Interaction.InputBox(
+                "Erosão:\n1 - Binária (encolher/limpar ruído)\n2 - Tons de Cinza (min 3x3)",
+                "Erosão",
+                "1");
+            if (string.IsNullOrWhiteSpace(choice)) return;
+
+            Bitmap result = choice.Trim() == "2"
+                ? ImageProcessor.ErodeGrayscale(transformedImage)
+                : ImageProcessor.ErodeBinary(transformedImage);
+
+            transformedImage?.Dispose();
+            transformedImage = result;
+            AdjustDisplayModeForImage(transformedImage);
+            transformedImageBox.Image = transformedImage;
+            SaveToHistory();
         }
 
         private void Opening_Click(object? sender, EventArgs e)
