@@ -15,10 +15,9 @@ namespace CoreBrush
         private MenuStrip menuStrip = null!;
         private OpenFileDialog openFileDialog = null!;
         private SaveFileDialog saveFileDialog = null!;
-        private Bitmap? originalImage;
-        private Bitmap? transformedImage;
-        private List<Bitmap> imageHistory = new List<Bitmap>(); // Histórico de transformações
-        private int maxHistorySize = 10; // Limite do histórico
+    private Bitmap? originalImage;
+    private Bitmap? transformedImage;
+    private HistoryManager history = new HistoryManager { Capacity = 10 }; // Histórico de transformações
 
         public MainForm()
         {
@@ -182,8 +181,8 @@ namespace CoreBrush
                     AdjustDisplayModeForImage(transformedImage);
                     transformedImageBox.Image = transformedImage;
                     // Limpar histórico e adicionar estado inicial
-                    ClearHistory();
-                    SaveToHistory();
+                    history.Clear();
+                    history.Push(transformedImage);
                 }
                 catch (Exception ex)
                 {
@@ -422,30 +421,9 @@ namespace CoreBrush
                 return;
             }
 
-            Bitmap bmp = new Bitmap(transformedImage.Width, transformedImage.Height);
-            for (int x = 0; x < transformedImage.Width; x++)
-            {
-                for (int y = 0; y < transformedImage.Height; y++)
-                {
-                    Color pixel = transformedImage.GetPixel(x, y);
-                    
-                    // Aplicar contraste primeiro, depois brilho
-                    int r = (int)(((pixel.R / 255.0 - 0.5) * contrast + 0.5) * 255.0 + brightness);
-                    int g = (int)(((pixel.G / 255.0 - 0.5) * contrast + 0.5) * 255.0 + brightness);
-                    int b = (int)(((pixel.B / 255.0 - 0.5) * contrast + 0.5) * 255.0 + brightness);
-                    
-                    // Garantir que os valores estejam entre 0 e 255
-                    r = Math.Max(0, Math.Min(255, r));
-                    g = Math.Max(0, Math.Min(255, g));
-                    b = Math.Max(0, Math.Min(255, b));
-                    
-                    Color adjustedColor = Color.FromArgb(pixel.A, r, g, b);
-                    bmp.SetPixel(x, y, adjustedColor);
-                }
-            }
-
+            var bc = ImageProcessor.BrightnessContrast(transformedImage, brightness, contrast);
             transformedImage?.Dispose();
-            transformedImage = bmp;
+            transformedImage = bc;
             AdjustDisplayModeForImage(transformedImage);
             transformedImageBox.Image = transformedImage;
             SaveToHistory();
@@ -459,21 +437,9 @@ namespace CoreBrush
                 return;
             }
 
-            Bitmap bmp = new Bitmap(transformedImage.Width, transformedImage.Height);
-            for (int x = 0; x < transformedImage.Width; x++)
-            {
-                for (int y = 0; y < transformedImage.Height; y++)
-                {
-                    Color pixel = transformedImage.GetPixel(x, y);
-                    // Conversão para escala de cinza usando luminância
-                    int gray = (int)(0.299 * pixel.R + 0.587 * pixel.G + 0.114 * pixel.B);
-                    Color grayColor = Color.FromArgb(pixel.A, gray, gray, gray);
-                    bmp.SetPixel(x, y, grayColor);
-                }
-            }
-
+            var grayBmp = ImageProcessor.Grayscale(transformedImage);
             transformedImage?.Dispose();
-            transformedImage = bmp;
+            transformedImage = grayBmp;
             AdjustDisplayModeForImage(transformedImage);
             transformedImageBox.Image = transformedImage;
             SaveToHistory();
@@ -505,7 +471,7 @@ namespace CoreBrush
                     { 4, 16, 24, 16, 4 },
                     { 1,  4,  6,  4, 1 }
                 };
-                result = ApplyConvolution(transformedImage, kernel, factor: 1.0 / 256.0, bias: 0.0);
+                result = ImageProcessor.ApplyConvolution(transformedImage, kernel, factor: 1.0 / 256.0, bias: 0.0);
             }
             else
             {
@@ -516,7 +482,7 @@ namespace CoreBrush
                     { 1, 1, 1 },
                     { 1, 1, 1 }
                 };
-                result = ApplyConvolution(transformedImage, kernel, factor: 1.0 / 9.0, bias: 0.0);
+                result = ImageProcessor.ApplyConvolution(transformedImage, kernel, factor: 1.0 / 9.0, bias: 0.0);
             }
 
             transformedImage?.Dispose();
@@ -551,7 +517,7 @@ namespace CoreBrush
                     { -1, -1, -1 }
                 };
                 // Aplicar laplaciano para extrair bordas e normalizar para visualização
-                var edges = ApplyConvolution(transformedImage, kernel, factor: 1.0, bias: 0.0, clampToGrayScale: true, absoluteValue: true);
+                var edges = ImageProcessor.ApplyConvolution(transformedImage, kernel, factor: 1.0, bias: 0.0, clampToGrayScale: true, absoluteValue: true);
                 result = edges;
             }
             else
@@ -575,8 +541,8 @@ namespace CoreBrush
                     { 4, 16, 24, 16, 4 },
                     { 1,  4,  6,  4, 1 }
                 };
-                using var blurred = ApplyConvolution(transformedImage, g, factor: 1.0 / 256.0, bias: 0.0);
-                result = ApplyUnsharp(transformedImage, blurred, amount);
+                using var blurred = ImageProcessor.ApplyConvolution(transformedImage, g, factor: 1.0 / 256.0, bias: 0.0);
+                result = ImageProcessor.ApplyUnsharp(transformedImage, blurred, amount);
             }
 
             transformedImage?.Dispose();
@@ -611,7 +577,7 @@ namespace CoreBrush
                         MessageBox.Show("Valor inválido. Use 0 a 255.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         return;
                     }
-                    result = ApplyThresholdManual(transformedImage, t);
+                    result = ImageProcessor.ThresholdManual(transformedImage, t);
                     break;
                 case "3":
                     var cStr = Interaction.InputBox("Constante C (desloca o limiar local):", "Threshold Adaptativo", "5");
@@ -622,12 +588,12 @@ namespace CoreBrush
                         MessageBox.Show("Valor inválido para C.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         return;
                     }
-                    result = ApplyThresholdAdaptiveGaussian(transformedImage, C);
+                    result = ImageProcessor.ThresholdAdaptiveGaussian(transformedImage, C);
                     break;
                 case "2":
                 default:
-                    int otsuT = ComputeOtsuThreshold(transformedImage);
-                    result = ApplyThresholdManual(transformedImage, otsuT);
+                    int otsuT = ImageProcessor.ComputeOtsuThreshold(transformedImage);
+                    result = ImageProcessor.ThresholdManual(transformedImage, otsuT);
                     break;
             }
 
@@ -674,43 +640,25 @@ namespace CoreBrush
         private void SaveToHistory()
         {
             if (transformedImage == null) return;
-            
-            // Adicionar cópia da imagem atual ao histórico
-            imageHistory.Add(new Bitmap(transformedImage));
-            
-            // Limitar tamanho do histórico
-            while (imageHistory.Count > maxHistorySize)
-            {
-                imageHistory[0].Dispose();
-                imageHistory.RemoveAt(0);
-            }
+            history.Push(transformedImage);
         }
 
         private void ClearHistory()
         {
-            foreach (var img in imageHistory)
-            {
-                img.Dispose();
-            }
-            imageHistory.Clear();
+            history.Clear();
         }
 
         private void Undo_Click(object? sender, EventArgs e)
         {
-            if (imageHistory.Count < 2)
+            if (!history.CanUndo)
             {
                 MessageBox.Show("Nenhuma operação para desfazer!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // Remove a imagem atual (última do histórico)
-            var currentImage = imageHistory[imageHistory.Count - 1];
-            currentImage.Dispose();
-            imageHistory.RemoveAt(imageHistory.Count - 1);
-
-            // Restaura a imagem anterior
+            // Restaura a imagem anterior via HistoryManager
             transformedImage?.Dispose();
-            transformedImage = new Bitmap(imageHistory[imageHistory.Count - 1]);
+            transformedImage = history.Undo();
             AdjustDisplayModeForImage(transformedImage);
             transformedImageBox.Image = transformedImage;
         }
@@ -931,7 +879,7 @@ namespace CoreBrush
             {
                 originalImage?.Dispose();
                 transformedImage?.Dispose();
-                ClearHistory();
+                history.Dispose();
             }
             base.Dispose(disposing);
         }
