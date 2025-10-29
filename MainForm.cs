@@ -96,6 +96,7 @@ namespace CoreBrush
             morphologyMenu.DropDownItems.Add("&Erosão", null, Erosion_Click);
             morphologyMenu.DropDownItems.Add("&Abertura", null, Opening_Click);
             morphologyMenu.DropDownItems.Add("&Fechamento", null, Closing_Click);
+            morphologyMenu.DropDownItems.Add("&Esqueletização", null, Skeletonization_Click);
 
             // Menu EXTRAÇÃO DE CARACTERÍSTICAS
             var featuresMenu = new ToolStripMenuItem("&Extração de Características");
@@ -662,18 +663,134 @@ namespace CoreBrush
 
         private void Opening_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show("Funcionalidade de Abertura será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var choice = Interaction.InputBox(
+                "Abertura (Erosão -> Dilatação) com SE 3x3:\n1 - Binária\n2 - Tons de Cinza",
+                "Abertura",
+                "1");
+            if (string.IsNullOrWhiteSpace(choice)) return;
+
+            Bitmap result;
+            if (choice.Trim() == "2")
+            {
+                using var eroded = ImageProcessor.ErodeGrayscale(transformedImage);
+                result = ImageProcessor.DilateGrayscale(eroded);
+            }
+            else
+            {
+                using var eroded = ImageProcessor.ErodeBinary(transformedImage);
+                result = ImageProcessor.DilateBinary(eroded);
+            }
+
+            transformedImage?.Dispose();
+            transformedImage = result;
+            AdjustDisplayModeForImage(transformedImage);
+            transformedImageBox.Image = transformedImage;
+            SaveToHistory();
         }
 
         private void Closing_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show("Funcionalidade de Fechamento será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var choice = Interaction.InputBox(
+                "Fechamento (Dilatação -> Erosão) com SE 3x3:\n1 - Binária\n2 - Tons de Cinza",
+                "Fechamento",
+                "1");
+            if (string.IsNullOrWhiteSpace(choice)) return;
+
+            Bitmap result;
+            if (choice.Trim() == "2")
+            {
+                using var dilated = ImageProcessor.DilateGrayscale(transformedImage);
+                result = ImageProcessor.ErodeGrayscale(dilated);
+            }
+            else
+            {
+                using var dilated = ImageProcessor.DilateBinary(transformedImage);
+                result = ImageProcessor.ErodeBinary(dilated);
+            }
+
+            transformedImage?.Dispose();
+            transformedImage = result;
+            AdjustDisplayModeForImage(transformedImage);
+            transformedImageBox.Image = transformedImage;
+            SaveToHistory();
         }
 
         // Extração de Características
         private void Challenge_Click(object? sender, EventArgs e)
         {
             MessageBox.Show("Funcionalidade de Desafio será implementada.", "Em desenvolvimento", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void Skeletonization_Click(object? sender, EventArgs e)
+        {
+            if (transformedImage == null)
+            {
+                MessageBox.Show("Nenhuma imagem carregada!", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Verifica rapidamente se a imagem parece binária (0/255) amostrando alguns pixels
+            bool isBinary = true;
+            for (int y = 0; y < transformedImage.Height && y < 10 && isBinary; y++)
+            {
+                for (int x = 0; x < transformedImage.Width && x < 10; x++)
+                {
+                    var p = transformedImage.GetPixel(x, y);
+                    int gray = (int)(0.299 * p.R + 0.587 * p.G + 0.114 * p.B);
+                    if (!(gray == 0 || gray == 255)) { isBinary = false; break; }
+                }
+            }
+
+            if (!isBinary)
+            {
+                var resp = Interaction.InputBox("A imagem não parece binária. Aplicar Otsu antes? (1=Sim, 2=Não)", "Esqueletização", "1");
+                if (string.IsNullOrWhiteSpace(resp)) return;
+                if (resp.Trim() == "1")
+                {
+                    int t = ImageProcessor.ComputeOtsuThreshold(transformedImage);
+                    using var bin = ImageProcessor.ThresholdManual(transformedImage, t);
+                    transformedImage?.Dispose();
+                    transformedImage = new Bitmap(bin);
+                }
+            }
+
+            // Garantir que o objeto esteja em branco (foreground=255) e fundo preto, invertendo se necessário
+            int white = 0, black = 0;
+            for (int y = 0; y < transformedImage.Height; y += Math.Max(1, transformedImage.Height / 200))
+            {
+                for (int x = 0; x < transformedImage.Width; x += Math.Max(1, transformedImage.Width / 200))
+                {
+                    var p = transformedImage.GetPixel(x, y);
+                    int gray = (int)(0.299 * p.R + 0.587 * p.G + 0.114 * p.B);
+                    if (gray >= 128) white++; else black++;
+                }
+            }
+            // Se a maioria é branca, provavelmente o fundo é branco e o objeto é preto -> inverter
+            if (white > black)
+            {
+                using var inv = ImageProcessor.Invert(transformedImage);
+                transformedImage?.Dispose();
+                transformedImage = new Bitmap(inv);
+            }
+
+            using var skel = ImageProcessor.SkeletonizeZhangSuen(transformedImage);
+            transformedImage?.Dispose();
+            transformedImage = new Bitmap(skel);
+            AdjustDisplayModeForImage(transformedImage);
+            transformedImageBox.Image = transformedImage;
+            SaveToHistory();
         }
 
         // Métodos de histórico e desfazer

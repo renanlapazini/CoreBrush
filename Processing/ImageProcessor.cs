@@ -211,6 +211,25 @@ namespace CoreBrush
             return result;
         }
 
+        // Invert colors (useful to make objects white on black background for binary/thinning)
+        public static Bitmap Invert(Bitmap source)
+        {
+            int w = source.Width, h = source.Height;
+            Bitmap result = new Bitmap(w, h);
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    var p = source.GetPixel(x, y);
+                    int r = 255 - p.R;
+                    int g = 255 - p.G;
+                    int b = 255 - p.B;
+                    result.SetPixel(x, y, Color.FromArgb(p.A, r, g, b));
+                }
+            }
+            return result;
+        }
+
         // ============================
         // Morphology (3x3 structuring element)
         // ============================
@@ -333,6 +352,125 @@ namespace CoreBrush
                 }
             }
             return result;
+        }
+
+        // ============================
+        // Skeletonization (Zhang-Suen thinning)
+        // Assumes binary image: foreground (object) = white (255), background = black (0)
+        // ============================
+        public static Bitmap SkeletonizeZhangSuen(Bitmap source)
+        {
+            int w = source.Width, h = source.Height;
+            bool[,] img = new bool[h, w];
+
+            // Load as boolean (true=foreground)
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    var p = source.GetPixel(x, y);
+                    int gray = (int)(0.299 * p.R + 0.587 * p.G + 0.114 * p.B);
+                    img[y, x] = gray > 0; // treat any >0 as foreground
+                }
+            }
+
+            bool changed;
+            do
+            {
+                changed = false;
+                List<(int y, int x)> toRemove = new List<(int, int)>();
+                // Sub-iteration 1
+                for (int y = 1; y < h - 1; y++)
+                {
+                    for (int x = 1; x < w - 1; x++)
+                    {
+                        if (!img[y, x]) continue; // background
+                        int b = CountNeighbors(img, y, x);
+                        if (b < 2 || b > 6) continue;
+                        int a = Transitions(img, y, x);
+                        if (a != 1) continue;
+                        bool p2 = img[y - 1, x];
+                        bool p4 = img[y, x + 1];
+                        bool p6 = img[y + 1, x];
+                        bool p8 = img[y, x - 1];
+                        if (!( (!p2 || !p4 || !p6) && (!p4 || !p6 || !p8) )) continue;
+                        toRemove.Add((y, x));
+                    }
+                }
+                if (toRemove.Count > 0)
+                {
+                    changed = true;
+                    foreach (var (yy, xx) in toRemove) img[yy, xx] = false;
+                }
+
+                toRemove.Clear();
+                // Sub-iteration 2
+                for (int y = 1; y < h - 1; y++)
+                {
+                    for (int x = 1; x < w - 1; x++)
+                    {
+                        if (!img[y, x]) continue;
+                        int b = CountNeighbors(img, y, x);
+                        if (b < 2 || b > 6) continue;
+                        int a = Transitions(img, y, x);
+                        if (a != 1) continue;
+                        bool p2 = img[y - 1, x];
+                        bool p4 = img[y, x + 1];
+                        bool p6 = img[y + 1, x];
+                        bool p8 = img[y, x - 1];
+                        if (!( (!p2 || !p4 || !p8) && (!p2 || !p6 || !p8) )) continue;
+                        toRemove.Add((y, x));
+                    }
+                }
+                if (toRemove.Count > 0)
+                {
+                    changed = true;
+                    foreach (var (yy, xx) in toRemove) img[yy, xx] = false;
+                }
+
+            } while (changed);
+
+            // Build result bitmap
+            Bitmap result = new Bitmap(w, h);
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    int v = img[y, x] ? 255 : 0;
+                    result.SetPixel(x, y, Color.FromArgb(255, v, v, v));
+                }
+            }
+            return result;
+        }
+
+        private static int CountNeighbors(bool[,] img, int y, int x)
+        {
+            int c = 0;
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++)
+                    if (!(dy == 0 && dx == 0) && img[y + dy, x + dx]) c++;
+            return c;
+        }
+
+        private static int Transitions(bool[,] img, int y, int x)
+        {
+            // p2..p9 (clockwise starting at north)
+            bool p2 = img[y - 1, x];
+            bool p3 = img[y - 1, x + 1];
+            bool p4 = img[y, x + 1];
+            bool p5 = img[y + 1, x + 1];
+            bool p6 = img[y + 1, x];
+            bool p7 = img[y + 1, x - 1];
+            bool p8 = img[y, x - 1];
+            bool p9 = img[y - 1, x - 1];
+
+            bool[] seq = new[] { p2, p3, p4, p5, p6, p7, p8, p9, p2 };
+            int transitions = 0;
+            for (int i = 0; i < 8; i++)
+            {
+                if (!seq[i] && seq[i + 1]) transitions++;
+            }
+            return transitions;
         }
     }
 }

@@ -66,6 +66,50 @@
 				"$msbuild"
 			],
 			"group": "build"
+		},
+		{
+			"label": "build-corebrush",
+			"type": "shell",
+			"command": "dotnet build",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [
+				"$msbuild"
+			],
+			"group": "build"
+		},
+		{
+			"label": "build-corebrush",
+			"type": "shell",
+			"command": "dotnet build",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [
+				"$msbuild"
+			],
+			"group": "build"
+		},
+		{
+			"label": "build-corebrush",
+			"type": "shell",
+			"command": "dotnet build",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [
+				"$msbuild"
+			],
+			"group": "build"
+		},
+		{
+			"label": "build-corebrush",
+			"type": "shell",
+			"command": "dotnet build",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [
+				"$msbuild"
+			],
+			"group": "build"
 		}
 	]
 }
