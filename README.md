@@ -81,7 +81,4 @@ dotnet run
 - Windows Forms
 - System.Drawing para manipulação de imagens
 
-## Contribuição
-
-Este é um projeto pessoal desenvolvido por Renan Lapazini para estudos em processamento de imagens.
 
