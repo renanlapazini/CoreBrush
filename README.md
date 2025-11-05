@@ -1,4 +1,4 @@
-# CoreBrush - Editor de Imagens
+# CoreBrush - Editor de Imagens (em desenvolvimento)
 
 **Desenvolvido por:** Renan Lapazini
 
@@ -84,3 +84,4 @@ dotnet run
 ## Contribuição
 
 Este é um projeto pessoal desenvolvido por Renan Lapazini para estudos em processamento de imagens.
+
